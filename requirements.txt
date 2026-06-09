@@ -1,0 +1,6 @@
+flask>=2.3.0
+werkzeug>=2.3.0
+pillow>=10.0.0
+openai-whisper>=20250625
+easyocr>=1.7.0
+imageio-ffmpeg>=0.6.0
