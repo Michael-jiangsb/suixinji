@@ -157,6 +157,10 @@
             </div>
             <button class="btn-voice" id="btnVoice" onclick="toggleVoice()">开始录音</button>
           </div>
+          <!-- 语音不可用时的备用手动输入 -->
+          <div class="voice-fallback hidden" id="voiceFallback">
+            <p class="voice-fallback-hint">语音识别暂不可用（国内网络限制或浏览器不支持），请直接在下方手动输入你的想法：</p>
+          </div>
           <textarea id="voiceTextResult" class="note-textarea" placeholder="语音识别结果将显示在这里，可以手动编辑…" rows="3"></textarea>
           <div class="input-actions">
             <select class="topic-select" id="voiceTopicSelect">

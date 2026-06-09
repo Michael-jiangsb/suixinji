@@ -348,6 +348,8 @@ async function initVoice() {
     hintEl.textContent = '当前浏览器不支持语音识别（需要 Chrome 或 Edge）';
     btnEl.textContent = '暂不可用';
     btnEl.disabled = true;
+    // 显示手动输入提示
+    showManualVoiceFallback();
     return;
   }
 
@@ -357,6 +359,7 @@ async function initVoice() {
     hintEl.textContent = '语音识别需要 HTTPS 或本地访问，请使用 https:// 开头的地址';
     btnEl.textContent = '暂不可用';
     btnEl.disabled = true;
+    showManualVoiceFallback();
     return;
   }
 
@@ -374,6 +377,8 @@ async function initVoice() {
       document.getElementById('voiceHint').textContent = '正在聆听，请说话…';
       document.getElementById('btnVoice').textContent = '停止识别';
       document.getElementById('btnVoice').classList.add('recording');
+      // 隐藏 fallback
+      document.getElementById('voiceFallback').classList.add('hidden');
     };
 
     speechRecognition.onresult = (event) => {
@@ -397,15 +402,16 @@ async function initVoice() {
         case 'no-speech': msg = '未检测到语音，请重试'; break;
         case 'audio-capture': msg = '无法访问麦克风，请检查设备权限'; break;
         case 'not-allowed': msg = '麦克风权限被拒绝，请在浏览器设置中允许'; break;
-        case 'network': msg = '语音识别需要联网（Chrome 云端识别），请检查网络'; break;
+        case 'network': msg = '语音识别需要访问 Google 服务（国内网络可能受限），请尝试手动输入或使用录音功能'; break;
         case 'aborted': msg = '识别已中止'; break;
         case 'language-not-supported': msg = '不支持中文语音识别'; break;
-        case 'service-not-allowed': msg = '语音识别服务不可用，请检查浏览器设置'; break;
-        default: msg = '识别出错：' + (event.error || '未知错误');
+        case 'service-not-allowed': msg = '语音识别服务不可用（国内网络限制），请使用下方手动输入或录音功能'; break;
+        default: msg = '识别出错：' + (event.error || '未知错误') + '。请尝试手动输入';
       }
       document.getElementById('voiceHint').textContent = msg;
       toast(msg, 'error');
       resetVoiceUI();
+      showManualVoiceFallback();
     };
 
     speechRecognition.onend = () => {
@@ -417,11 +423,19 @@ async function initVoice() {
     };
 
     hintEl.textContent = '点击开始语音识别（需要联网，支持中文）';
+    // 语音可用时隐藏 fallback
+    document.getElementById('voiceFallback').classList.add('hidden');
   } catch(e) {
     hintEl.textContent = '语音识别初始化失败: ' + e.message;
     btnEl.textContent = '暂不可用';
     btnEl.disabled = true;
+    showManualVoiceFallback();
   }
+}
+
+/** 显示语音不可用时的备用手动输入方案 */
+function showManualVoiceFallback() {
+  document.getElementById('voiceFallback').classList.remove('hidden');
 }
 
 function resetVoiceUI() {
@@ -539,10 +553,10 @@ async function getTesseractWorker() {
 
   const progressEl = document.getElementById('ocrProgress');
   progressEl.classList.remove('hidden');
-  progressEl.textContent = '正在下载中文语言包（约 12MB，仅首次需要）…';
+  progressEl.textContent = '正在初始化 OCR 引擎（本地语言包，无需联网）…';
 
   // 使用超时 Promise + createWorker，避免网络问题导致永久卡住
-  const WORKER_TIMEOUT_MS = 120000; // 2 分钟超时
+  const WORKER_TIMEOUT_MS = 60000; // 1 分钟超时（本地语言包加载很快）
 
   // 创建超时 Promise
   const timeoutPromise = new Promise(function(_, reject) {
@@ -554,10 +568,13 @@ async function getTesseractWorker() {
   try {
     tesseractWorker = await Promise.race([
       Tesseract.createWorker(['chi_sim', 'eng'], 1, {
-        // unpkg CDN（国内可访问），302 重定向后由 Cloudflare 缓存加速
-        // 注意：langPath 只支持字符串，不支持函数（Tesseract.js v5 内部会用 new URL() 处理）
-        langPath: 'https://unpkg.com/@tesseract.js-data/',
-        corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/',
+        // 使用本地 tessdata 目录（已预下载语言包，无需联网）
+        // 格式：Tesseract.js 内部构造 URL 为 {langPath}/{lang}.traineddata.gz
+        langPath: 'tessdata',
+        // corePath 使用 unpkg CDN（核心引擎文件，约 2MB）
+        corePath: 'https://unpkg.com/tesseract.js-core@5.0.0',
+        // workerPath 也指向 unpkg（避免 jsDelivr 被墙）
+        workerPath: 'https://unpkg.com/tesseract.js@5.1.1/dist/worker.min.js',
         logger: (m) => {
           if (m.status === 'recognizing text') {
             const pct = Math.round(m.progress * 100);
