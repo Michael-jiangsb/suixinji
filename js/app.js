@@ -923,13 +923,53 @@ async function saveNote(content, source, topicId, imageDataUrl) {
       topicId: topicId ? parseInt(topicId) : null,
       imageData: imageDataUrl || null
     });
-    await loadNotes(currentTopicId);
-    await loadStats();
-    await loadTopics();
+
+    // 乐观更新：立即将新笔记插入 notes 数组头部，实现即时显示
+    notes.unshift(note);
+    renderNotes();
+
+    // 后台异步刷新确保数据一致性（静默更新）
+    loadNotes(currentTopicId).catch(() => {});
+    loadStats().catch(() => {});
+    loadTopics().catch(() => {});
+
+    // 如果笔记归属某个主题，自动在思维导图中创建对应节点
+    if (topicId) {
+      try {
+        const existingNodes = await getByIndex('mindmap_nodes', 'by_topic', parseInt(topicId));
+        if (!existingNodes || existingNodes.length === 0) {
+          // 该主题还没有任何思维导图节点，从所有笔记生成默认节点
+          const allNotes = await apiGetNotes(topicId);
+          if (allNotes && allNotes.length > 0) {
+            for (let i = 0; i < allNotes.length; i++) {
+              const n = allNotes[i];
+              await add('mindmap_nodes', {
+                topicId: parseInt(topicId),
+                parentId: null,
+                label: (n.summary || n.content.slice(0, 30)),
+                orderIdx: i
+              });
+            }
+          }
+        } else {
+          // 已有节点，追加新笔记节点
+          const maxOrder = Math.max(...existingNodes.map(n => n.orderIdx || 0), -1);
+          await add('mindmap_nodes', {
+            topicId: parseInt(topicId),
+            parentId: null,
+            label: note.summary || content.slice(0, 30),
+            orderIdx: maxOrder + 1
+          });
+        }
+      } catch(e) { /* 静默失败，不影响核心功能 */ }
+    }
+
     toast(`想法已保存${note.summary ? '：' + note.summary : ''}`, 'success');
     return note;
   } catch(e) {
     toast('保存失败: ' + e.message, 'error');
+    // 回滚：重新加载恢复状态
+    loadNotes(currentTopicId).catch(() => {});
     return null;
   }
 }

@@ -267,8 +267,26 @@ function apiGetMindmap(topicId) {
     getById('topics', topicId),
     getByIndex('notes', 'by_topic', topicId),
     getByIndex('mindmap_nodes', 'by_topic', topicId)
-  ]).then(([topic, notes, nodes]) => {
+  ]).then(async ([topic, notes, rawNodes]) => {
     if (!topic) throw new Error('主题不存在');
+
+    // 如果思维导图没有节点但该主题有笔记，自动从笔记生成默认节点
+    let nodes = rawNodes;
+    if ((!nodes || nodes.length === 0) && notes && notes.length > 0) {
+      const createdNodes = [];
+      for (let i = 0; i < notes.length; i++) {
+        const n = notes[i];
+        const created = await add('mindmap_nodes', {
+          topicId: topicId,
+          parentId: null,
+          label: (n.summary || n.content.slice(0, 30)),
+          orderIdx: i
+        });
+        createdNodes.push(created);
+      }
+      nodes = createdNodes;
+    }
+
     // 构建树形结构
     const nodeDict = {};
     const tree = [];
