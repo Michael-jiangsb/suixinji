@@ -1,9 +1,10 @@
 /**
  * 随心记 - Service Worker
  * PWA 离线缓存 + 更新策略：Cache First, Network Update
+ * 特别处理：jsDelivr CDN 在国内不稳定，自动重定向到 gcore 镜像
  */
-const CACHE_NAME = 'suixinji-v4';
-const TESSERACT_CACHE = 'tesseract-data-v2';
+const CACHE_NAME = 'suixinji-v5';
+const TESSERACT_CACHE = 'tesseract-data-v3';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -11,6 +12,12 @@ const PRECACHE_URLS = [
   '/js/db.js',
   '/js/app.js',
   '/manifest.json'
+];
+
+// jsDelivr CDN 镜像映射（国内优先）
+const JSDELIVR_MIRRORS = [
+  'https://gcore.jsdelivr.net',
+  'https://fastly.jsdelivr.net',
 ];
 
 // 安装：预缓存核心文件
@@ -44,21 +51,55 @@ self.addEventListener('activate', (event) => {
 
 // 请求拦截：缓存优先 + 网络更新
 self.addEventListener('fetch', (event) => {
-  // 跳过非 GET 请求
   if (event.request.method !== 'GET') return;
-  // 跳过 chrome-extension 和 Tesseract CDN
   const url = new URL(event.request.url);
   if (url.protocol === 'chrome-extension:') return;
 
-  // 对于 Tesseract 语言包 CDN（unpkg.com），使用缓存优先以加速二次加载
-  if (url.hostname === 'unpkg.com' && url.pathname.includes('tesseract')) {
+  // jsDelivr 主站 → 自动重定向到 gcore 镜像（国内加速）
+  if (url.hostname === 'cdn.jsdelivr.net') {
+    event.respondWith(jsdelivrMirrorFetch(event.request, url));
+    return;
+  }
+
+  // Tesseract 语言包 CDN（unpkg/gcore/fastly）→ 缓存优先
+  if ((url.hostname === 'unpkg.com' && url.pathname.includes('tesseract')) ||
+      (url.hostname.includes('jsdelivr.net') && url.pathname.includes('tesseract'))) {
     event.respondWith(tesseractCacheFirst(event.request));
     return;
   }
 
-  // 本地资源：缓存优先
   event.respondWith(cacheFirst(event.request));
 });
+
+/**
+ * jsDelivr 镜像回退：拦截 cdn.jsdelivr.net 请求，依次尝试 gcore → fastly 镜像
+ * 首次成功后缓存，后续秒开
+ */
+async function jsdelivrMirrorFetch(originalRequest, originalUrl) {
+  const cached = await caches.match(originalRequest, { cacheName: TESSERACT_CACHE });
+  if (cached) {
+    console.log('[SW] jsDelivr cache hit:', originalUrl.href);
+    return cached;
+  }
+
+  const pathWithQuery = originalUrl.pathname + originalUrl.search;
+  for (const mirror of JSDELIVR_MIRRORS) {
+    try {
+      const mirrorUrl = mirror + pathWithQuery;
+      console.log('[SW] Trying mirror:', mirrorUrl);
+      const response = await fetch(mirrorUrl, { signal: AbortSignal.timeout(30000) });
+      if (response.ok) {
+        const cache = await caches.open(TESSERACT_CACHE);
+        cache.put(originalRequest, response.clone());
+        console.log('[SW] Mirror success, cached');
+        return response;
+      }
+    } catch (e) {
+      console.warn('[SW] Mirror failed:', mirror, e.message);
+    }
+  }
+  return new Response('CDN unavailable', { status: 503 });
+}
 
 // Tesseract 语言包专用缓存策略（长期缓存，因为这些文件不会变）
 async function tesseractCacheFirst(request) {
