@@ -438,7 +438,11 @@ async function toggleVoice() {
 async function startRecording() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    toast('浏览器不支持语音识别', 'error');
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const msg = isIOS
+      ? 'iOS Safari 不支持语音识别，请使用 Chrome 浏览器'
+      : '浏览器不支持语音识别，请使用 Chrome 或 Edge';
+    toast(msg, 'error');
     return;
   }
 
@@ -479,8 +483,22 @@ async function startRecording() {
 
   try {
     speechRecognition.start();
+    console.log('SpeechRecognition started successfully');
   } catch (e) {
-    toast('启动语音识别失败: ' + e.message, 'error');
+    console.error('SpeechRecognition start error:', e);
+    let errMsg = e.message || e.toString();
+    // 常见错误处理
+    if (errMsg.includes('already started') || e.name === 'InvalidStateError') {
+      // 已经启动中，先停止再启动
+      try { speechRecognition.stop(); } catch(e2) {}
+      setTimeout(() => {
+        try { speechRecognition.start(); } catch(e3) {
+          toast('启动语音识别失败: ' + e3.message, 'error');
+        }
+      }, 100);
+      return;
+    }
+    toast('启动语音识别失败: ' + errMsg, 'error');
   }
 }
 
@@ -521,8 +539,11 @@ async function getTesseractWorker() {
   progressEl.textContent = '正在下载中文语言包（约 12MB，仅首次需要）…';
 
   try {
-    // Tesseract.js v5 使用数组形式的语言参数，OEM=1 (LSTM only)
+    // Tesseract.js v5：使用 unpkg CDN（jsDelivr 在中国大陆被屏蔽）
+    // langPath 是基础路径，Tesseract 会自动追加 ${lang}/4.0.0/${lang}.traineddata.gz
     tesseractWorker = await Tesseract.createWorker(['chi_sim', 'eng'], 1, {
+      langPath: 'https://unpkg.com/@tesseract.js-data/',
+      corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/',
       logger: (m) => {
         if (m.status === 'recognizing text') {
           const pct = Math.round(m.progress * 100);
