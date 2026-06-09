@@ -538,29 +538,42 @@ async function getTesseractWorker() {
   progressEl.classList.remove('hidden');
   progressEl.textContent = '正在下载中文语言包（约 12MB，仅首次需要）…';
 
+  // 使用超时 Promise + createWorker，避免网络问题导致永久卡住
+  const WORKER_TIMEOUT_MS = 120000; // 2 分钟超时
+
+  // 创建超时 Promise
+  const timeoutPromise = new Promise(function(_, reject) {
+    setTimeout(function() {
+      reject(new Error('语言包下载超时（超过 2 分钟），请检查网络后重试'));
+    }, WORKER_TIMEOUT_MS);
+  });
+
   try {
-    // Tesseract.js v5：使用 unpkg CDN（jsDelivr 在中国大陆被屏蔽）
-    // langPath 是基础路径，Tesseract 会自动追加 ${lang}/4.0.0/${lang}.traineddata.gz
-    tesseractWorker = await Tesseract.createWorker(['chi_sim', 'eng'], 1, {
-      langPath: 'https://unpkg.com/@tesseract.js-data/',
-      corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/',
-      logger: (m) => {
-        if (m.status === 'recognizing text') {
-          const pct = Math.round(m.progress * 100);
-          progressEl.textContent = `识别中… ${pct}%`;
-        } else if (m.status === 'loading language traineddata') {
-          progressEl.textContent = '加载语言模型…';
-        } else if (m.status === 'loading tesseract core') {
-          progressEl.textContent = '加载 Tesseract 核心引擎…';
-        } else if (m.status === 'initializing tesseract') {
-          progressEl.textContent = '初始化引擎…';
-        } else if (m.status === 'initialized tesseract') {
-          progressEl.textContent = '引擎就绪，开始识别…';
-        } else if (m.status === 'downloading') {
-          progressEl.textContent = `下载中… ${Math.round(m.progress * 100)}%`;
+    tesseractWorker = await Promise.race([
+      Tesseract.createWorker(['chi_sim', 'eng'], 1, {
+        langPath: 'https://unpkg.com/@tesseract.js-data/',
+        corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/',
+        // 关键：缓存策略 - 通过 cachePath 让浏览器 Service Worker 缓存语言包
+        cachePath: '.',
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            const pct = Math.round(m.progress * 100);
+            progressEl.textContent = `识别中… ${pct}%`;
+          } else if (m.status === 'loading language traineddata') {
+            progressEl.textContent = '加载语言模型…';
+          } else if (m.status === 'loading tesseract core') {
+            progressEl.textContent = '加载 Tesseract 核心引擎…';
+          } else if (m.status === 'initializing tesseract') {
+            progressEl.textContent = '初始化引擎…';
+          } else if (m.status === 'initialized tesseract') {
+            progressEl.textContent = '引擎就绪，开始识别…';
+          } else if (m.status === 'downloading') {
+            progressEl.textContent = `下载中… ${Math.round(m.progress * 100)}%`;
+          }
         }
-      }
-    });
+      }),
+      timeoutPromise
+    ]);
     progressEl.classList.add('hidden');
     return tesseractWorker;
   } catch (e) {
@@ -614,13 +627,16 @@ async function processImageFile(file) {
   if (!allowed.includes(file.type)) { toast('不支持的图片格式，请使用 PNG/JPG/BMP/WebP', 'error'); return; }
   if (file.size > 20 * 1024 * 1024) { toast('图片过大，请选择 20MB 以内的图片', 'error'); return; }
 
-  // 显示预览
-  const reader = new FileReader();
-  reader.onload = e => {
-    ocrImageDataUrl = e.target.result;
-    document.getElementById('ocrPreviewImg').src = ocrImageDataUrl;
-  };
-  reader.readAsDataURL(file);
+  // 先用 Promise 等待 FileReader 完成，确保 ocrImageDataUrl 已赋值
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('图片读取失败'));
+    reader.readAsDataURL(file);
+  });
+
+  ocrImageDataUrl = dataUrl;
+  document.getElementById('ocrPreviewImg').src = ocrImageDataUrl;
 
   // 显示结果区域
   document.getElementById('imageDropZone').style.display = 'none';
@@ -658,11 +674,19 @@ async function doOcr() {
     progressEl.classList.remove('hidden');
     progressEl.textContent = '识别中…';
 
-    const { data: { text, confidence } } = await worker.recognize(processedUrl);
-
-    const result = text.trim();
-    // Tesseract.js v5: confidence 可能是数字或 undefined
-    const confVal = (typeof confidence === 'number') ? confidence : (data.confidence || 0);
+    // 给识别步骤也加超时（60 秒）
+    const recognizeTimeout = new Promise(function(_, reject) {
+      setTimeout(function() {
+        reject(new Error('识别超时（60 秒），图片可能过大或复杂，请尝试裁剪后重试'));
+      }, 60000);
+    });
+    const recognizeResult = await Promise.race([
+      worker.recognize(processedUrl),
+      recognizeTimeout
+    ]);
+    // Tesseract.js v5: recognize() 返回 { data: { text, confidence, ... } }
+    const result = (recognizeResult.data.text || '').trim();
+    const confVal = (typeof recognizeResult.data.confidence === 'number') ? recognizeResult.data.confidence : 0;
     if (result) {
       textEdit.value = result;
       textEdit.placeholder = 'OCR 识别完成，可以编辑…';

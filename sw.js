@@ -2,7 +2,8 @@
  * 随心记 - Service Worker
  * PWA 离线缓存 + 更新策略：Cache First, Network Update
  */
-const CACHE_NAME = 'suixinji-v2';
+const CACHE_NAME = 'suixinji-v3';
+const TESSERACT_CACHE = 'tesseract-data-v1';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -55,9 +56,36 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // 对于 Tesseract 语言包 CDN（unpkg.com），使用缓存优先以加速二次加载
+  if (url.hostname === 'unpkg.com' && url.pathname.includes('tesseract')) {
+    event.respondWith(tesseractCacheFirst(request));
+    return;
+  }
+
   // 本地资源：缓存优先
   event.respondWith(cacheFirst(event.request));
 });
+
+// Tesseract 语言包专用缓存策略（长期缓存，因为这些文件不会变）
+async function tesseractCacheFirst(request) {
+  const cached = await caches.match(request, { cacheName: TESSERACT_CACHE });
+  if (cached) {
+    console.log('[SW] Tesseract cache hit:', request.url);
+    return cached;
+  }
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(TESSERACT_CACHE);
+      cache.put(request, response.clone());
+      console.log('[SW] Tesseract cached:', request.url);
+    }
+    return response;
+  } catch (e) {
+    console.warn('[SW] Tesseract fetch failed:', e);
+    return new Response('Network error', { status: 503 });
+  }
+}
 
 // 缓存优先策略
 async function cacheFirst(request) {
