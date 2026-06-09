@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>随心记 — 记录你的每个灵感</title>
+<link rel="stylesheet" href="static/css/style.css">
+<!-- markmap for mind map rendering -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.15.4/dist/browser/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/markmap-view@0.15.4/dist/browser/index.js"></script>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<header class="app-header">
+  <div class="header-left">
+    <div class="logo">
+      <span class="logo-icon">✦</span>
+      <span class="logo-text">随心记</span>
+    </div>
+  </div>
+  <div class="header-center">
+    <div class="stats-bar" id="statsBar">
+      <span class="stat-item"><span id="statTopics">0</span> 个主题</span>
+      <span class="stat-dot">·</span>
+      <span class="stat-item"><span id="statNotes">0</span> 条想法</span>
+      <span class="stat-dot">·</span>
+      <span class="stat-item">今日 <span id="statToday">0</span> 条</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="btn-icon" onclick="showView('mindmap')" title="思维导图">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+    </button>
+    <button class="btn-primary" onclick="openNewNoteModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      新想法
+    </button>
+  </div>
+</header>
+
+<div class="app-layout">
+  <!-- 左侧主题栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">我的主题</span>
+      <button class="btn-icon-sm" onclick="openNewTopicModal()" title="新建主题">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+    <div class="topic-list" id="topicList">
+      <div class="loading-placeholder">加载中...</div>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="main-content">
+    <!-- 笔记列表视图 -->
+    <div id="viewNotes" class="view active">
+      <div class="view-header">
+        <div>
+          <h2 class="view-title" id="currentTopicName">全部想法</h2>
+          <p class="view-subtitle" id="currentTopicSubtitle">所有主题的想法汇总</p>
+        </div>
+        <div class="view-actions">
+          <button class="btn-outline" onclick="showView('mindmap')" id="btnShowMindmap" style="display:none">
+            查看思维导图
+          </button>
+        </div>
+      </div>
+
+      <!-- 快速输入区 -->
+      <div class="quick-input-card">
+        <div class="input-mode-tabs">
+          <button class="tab-btn active" data-mode="text" onclick="switchInputMode('text')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            文字输入
+          </button>
+          <button class="tab-btn" data-mode="voice" onclick="switchInputMode('voice')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+            语音输入
+          </button>
+          <button class="tab-btn" data-mode="image" onclick="switchInputMode('image')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            图片 OCR
+          </button>
+        </div>
+
+        <!-- 文字输入 -->
+        <div class="input-panel" id="panelText">
+          <textarea id="textInput" class="note-textarea" placeholder="记录你此刻的想法…" rows="3"></textarea>
+          <div class="input-actions">
+            <select class="topic-select" id="textTopicSelect">
+              <option value="">选择主题（可选）</option>
+            </select>
+            <button class="btn-primary" onclick="submitTextNote()">保存想法</button>
+          </div>
+        </div>
+
+        <!-- 语音输入 -->
+        <div class="input-panel hidden" id="panelVoice">
+          <div class="voice-area" id="voiceArea">
+            <div class="voice-status" id="voiceStatus">
+              <div class="voice-icon-wrap" id="voiceIconWrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+              </div>
+              <p class="voice-hint" id="voiceHint">点击开始语音识别</p>
+            </div>
+            <button class="btn-voice" id="btnVoice" onclick="toggleVoice()">开始录音</button>
+          </div>
+          <textarea id="voiceTextResult" class="note-textarea" placeholder="语音识别结果将显示在这里，可以手动编辑…" rows="3"></textarea>
+          <div class="input-actions">
+            <select class="topic-select" id="voiceTopicSelect">
+              <option value="">选择主题（可选）</option>
+            </select>
+            <button class="btn-primary" onclick="submitVoiceNote()">保存想法</button>
+          </div>
+        </div>
+
+        <!-- 图片 OCR -->
+        <div class="input-panel hidden" id="panelImage">
+          <div class="image-drop-zone" id="imageDropZone" onclick="document.getElementById('imageFileInput').click()">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <p>点击或拖拽图片至此处</p>
+            <p class="drop-hint">支持 PNG / JPG / BMP，图片中的文字将自动识别</p>
+            <input type="file" id="imageFileInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+          </div>
+          <div class="ocr-result hidden" id="ocrResult">
+            <div class="ocr-preview">
+              <img id="ocrPreviewImg" src="" alt="上传图片">
+            </div>
+            <div class="ocr-text-area">
+              <div class="ocr-label">识别结果 <span class="ocr-method-badge" id="ocrMethodBadge"></span></div>
+              <textarea id="ocrTextEdit" class="note-textarea" rows="4" placeholder="识别文字将显示在这里…"></textarea>
+              <div class="input-actions">
+                <select class="topic-select" id="ocrTopicSelect">
+                  <option value="">选择主题（可选）</option>
+                </select>
+                <button class="btn-outline" onclick="resetOcr()">重新上传</button>
+                <button class="btn-primary" onclick="submitOcrNote()">保存为想法</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 想法列表 -->
+      <div class="notes-container" id="notesContainer">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">✦</div>
+          <p>还没有记录任何想法</p>
+          <p class="empty-hint">从上方输入框开始记录吧</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 思维导图视图 -->
+    <div id="viewMindmap" class="view">
+      <div class="view-header">
+        <div>
+          <h2 class="view-title" id="mindmapTitle">思维导图</h2>
+          <p class="view-subtitle" id="mindmapSubtitle">可视化你的想法脉络</p>
+        </div>
+        <div class="view-actions">
+          <div class="mm-toolbar" id="mmToolbar" style="display:none">
+            <button class="btn-outline btn-sm" onclick="mmAddChild()" title="添加子节点">+子节点</button>
+            <button class="btn-outline btn-sm" onclick="mmAddSibling()" title="添加同级节点">+同级</button>
+            <button class="btn-outline btn-sm" onclick="mmEditNode()" title="编辑选中节点">编辑</button>
+            <button class="btn-outline btn-sm btn-danger-outline" onclick="mmDeleteNode()" title="删除选中节点">删除</button>
+            <span class="mm-toolbar-divider"></span>
+            <button class="btn-primary btn-sm" onclick="toggleAutoParse()" title="自动排版">⚡ 自动排版</button>
+          </div>
+          <button class="btn-outline" onclick="showView('notes')">返回列表</button>
+          <button class="btn-outline" onclick="loadMindmap(currentTopicId)">刷新</button>
+        </div>
+      </div>
+
+      <!-- 自动排版面板 -->
+      <div class="auto-parse-panel hidden" id="autoParsePanel">
+        <div class="auto-parse-header">
+          <span class="auto-parse-title">🧠 自动排版 — 输入想法，自动生成思维导图</span>
+          <button class="btn-icon-sm" onclick="toggleAutoParse()" title="关闭">✕</button>
+        </div>
+        <div class="auto-parse-body">
+          <div class="auto-parse-input-area">
+            <div class="auto-parse-tabs">
+              <button class="ap-tab-btn active" data-ap-mode="write" onclick="switchApMode('write')">✍️ 自由输入</button>
+              <button class="ap-tab-btn" data-ap-mode="import" onclick="switchApMode('import')">📋 从笔记导入</button>
+            </div>
+
+            <!-- 自由输入模式 -->
+            <div class="ap-panel" id="apPanelWrite">
+              <textarea id="apTextInput" class="ap-textarea" placeholder="输入你的想法，支持多种格式：
+
+· Markdown 标题（# 标题 ## 子标题）
+· 编号列表（1. 主项  1.1 子项）
+· 符号列表（- 项目  - 子项）
+· 缩进层级（用空格缩进表示父子关系）
+· 自然语言（自动按句子拆分）
+
+示例：
+# 产品规划
+## 功能设计
+- 用户登录
+- 数据看板
+## 技术方案
+1. 前端框架选择
+1.1 React
+1.2 Vue
+2. 后端架构
+2.1 微服务
+2.2 数据库设计" rows="12"></textarea>
+            </div>
+
+            <!-- 从笔记导入模式 -->
+            <div class="ap-panel hidden" id="apPanelImport">
+              <div class="ap-import-list" id="apImportList">
+                <div class="ap-import-empty">该主题下暂无笔记，请先在笔记列表中添加一些想法</div>
+              </div>
+            </div>
+
+            <!-- 操作按钮（两个模式共用） -->
+            <div class="ap-actions" id="apActionsBar">
+              <div class="ap-actions-left">
+                <label class="ap-checkbox">
+                  <input type="checkbox" id="apOverwrite">
+                  <span>覆盖已有节点</span>
+                </label>
+              </div>
+              <div class="ap-actions-right">
+                <button class="btn-outline" onclick="clearApText()" id="btnApClear">清空</button>
+                <button class="btn-primary" onclick="doAutoParse()" id="btnAutoParse">
+                  <span id="btnAutoParseText">生成思维导图</span>
+                  <span id="btnAutoParseSpinner" class="spinner-sm hidden"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 格式提示 -->
+          <div class="ap-format-hints">
+            <span class="ap-hint-title">💡 支持的输入格式：</span>
+            <div class="ap-hint-tags">
+              <span class="ap-hint-tag"># 标题层级</span>
+              <span class="ap-hint-tag">1. 编号列表</span>
+              <span class="ap-hint-tag">- 符号列表</span>
+              <span class="ap-hint-tag">空格缩进</span>
+              <span class="ap-hint-tag">自然语言</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mindmap-container" id="mindmapContainer">
+        <div class="mm-tree" id="mmTree"></div>
+        <svg id="mindmapSvg" style="display:none"></svg>
+      </div>
+      <div class="mindmap-empty" id="mindmapEmpty" style="display:none">
+        <p>该主题还没有想法，请先添加一些想法再查看思维导图</p>
+      </div>
+    </div>
+
+    <!-- ========== 弹窗：编辑思维导图节点 ========== -->
+    <div class="modal-overlay hidden" id="modalMmNode" onclick="if(event.target===this)closeModal('modalMmNode')">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <h3 id="mmModalTitle">编辑节点</h3>
+          <button class="btn-icon" onclick="closeModal('modalMmNode')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>节点文字</label>
+            <input type="text" class="form-input" id="mmNodeLabel" placeholder="输入节点内容…" maxlength="60">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-outline" onclick="closeModal('modalMmNode')">取消</button>
+          <button class="btn-primary" onclick="mmSaveNode()">保存</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ========== 弹窗：新建想法 ========== -->
+<div class="modal-overlay hidden" id="modalNewNote" onclick="if(event.target===this)closeModal('modalNewNote')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>新建想法</h3>
+      <button class="btn-icon" onclick="closeModal('modalNewNote')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>选择主题</label>
+        <select class="form-select" id="modalTopicSelect">
+          <option value="">不归属任何主题</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>想法内容</label>
+        <textarea class="note-textarea" id="modalNoteContent" rows="5" placeholder="写下你的想法…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeModal('modalNewNote')">取消</button>
+      <button class="btn-primary" onclick="saveModalNote()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 弹窗：新建主题 ========== -->
+<div class="modal-overlay hidden" id="modalNewTopic" onclick="if(event.target===this)closeModal('modalNewTopic')">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3>新建主题</h3>
+      <button class="btn-icon" onclick="closeModal('modalNewTopic')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>主题名称</label>
+        <input type="text" class="form-input" id="newTopicName" placeholder="例如：读书笔记、旅行计划…" maxlength="20">
+      </div>
+      <div class="form-group">
+        <label>主题颜色</label>
+        <div class="color-picker">
+          <div class="color-option selected" data-color="#4A90D9" style="background:#4A90D9" onclick="selectColor(this)"></div>
+          <div class="color-option" data-color="#7B68EE" style="background:#7B68EE" onclick="selectColor(this)"></div>
+          <div class="color-option" data-color="#52B788" style="background:#52B788" onclick="selectColor(this)"></div>
+          <div class="color-option" data-color="#E07A5F" style="background:#E07A5F" onclick="selectColor(this)"></div>
+          <div class="color-option" data-color="#F4A261" style="background:#F4A261" onclick="selectColor(this)"></div>
+          <div class="color-option" data-color="#A8DADC" style="background:#A8DADC" onclick="selectColor(this)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeModal('modalNewTopic')">取消</button>
+      <button class="btn-primary" onclick="saveTopic()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 弹窗：笔记详情/编辑 ========== -->
+<div class="modal-overlay hidden" id="modalNoteDetail" onclick="if(event.target===this)closeModal('modalNoteDetail')">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>想法详情</h3>
+      <button class="btn-icon" onclick="closeModal('modalNoteDetail')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="note-meta" id="noteDetailMeta"></div>
+      <div class="form-group">
+        <label>内容</label>
+        <textarea class="note-textarea" id="noteDetailContent" rows="8"></textarea>
+      </div>
+      <div class="note-summary-box" id="noteDetailSummaryBox" style="display:none">
+        <span class="summary-label">AI 摘要</span>
+        <span class="summary-text" id="noteDetailSummary"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" onclick="deleteCurrentNote()">删除</button>
+      <button class="btn-outline" onclick="closeModal('modalNoteDetail')">取消</button>
+      <button class="btn-primary" onclick="saveNoteDetail()">保存修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast 通知 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="static/js/app.js"></script>
+</body>
+</html>
