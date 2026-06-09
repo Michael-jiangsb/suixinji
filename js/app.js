@@ -553,10 +553,10 @@ async function getTesseractWorker() {
 
   const progressEl = document.getElementById('ocrProgress');
   progressEl.classList.remove('hidden');
-  progressEl.textContent = '正在初始化 OCR 引擎（本地语言包，无需联网）…';
+  progressEl.textContent = '正在初始化 OCR 引擎…';
 
   // 使用超时 Promise + createWorker，避免网络问题导致永久卡住
-  const WORKER_TIMEOUT_MS = 60000; // 1 分钟超时（本地语言包加载很快）
+  const WORKER_TIMEOUT_MS = 120000; // 2 分钟超时（CDN 下载语言包）
 
   // 创建超时 Promise
   const timeoutPromise = new Promise(function(_, reject) {
@@ -568,13 +568,8 @@ async function getTesseractWorker() {
   try {
     tesseractWorker = await Promise.race([
       Tesseract.createWorker(['chi_sim', 'eng'], 1, {
-        // 使用本地 tessdata 目录（已预下载语言包，无需联网）
-        // 格式：Tesseract.js 内部构造 URL 为 {langPath}/{lang}.traineddata.gz
-        langPath: 'tessdata',
-        // corePath 使用 unpkg CDN（核心引擎文件，约 2MB）
-        corePath: 'https://unpkg.com/tesseract.js-core@5.0.0',
-        // workerPath 也指向 unpkg（避免 jsDelivr 被墙）
-        workerPath: 'https://unpkg.com/tesseract.js@5.1.1/dist/worker.min.js',
+        // langPath 不设置，使用 Tesseract.js 默认 jsDelivr CDN（国内实测可用，20MB 约 1.7s）
+        // corePath 使用 unpkg CDN（核心引擎文件，约 2MB，避免 jsDelivr 单点故障）
         logger: (m) => {
           if (m.status === 'recognizing text') {
             const pct = Math.round(m.progress * 100);
