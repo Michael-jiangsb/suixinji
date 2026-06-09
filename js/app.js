@@ -391,18 +391,20 @@ async function initVoice() {
     };
 
     speechRecognition.onerror = (event) => {
-      console.error('SpeechRecognition error:', event.error);
+      console.error('SpeechRecognition error:', event.error, event.message);
       let msg = '';
       switch (event.error) {
         case 'no-speech': msg = '未检测到语音，请重试'; break;
-        case 'audio-capture': msg = '无法访问麦克风，请检查设备'; break;
+        case 'audio-capture': msg = '无法访问麦克风，请检查设备权限'; break;
         case 'not-allowed': msg = '麦克风权限被拒绝，请在浏览器设置中允许'; break;
-        case 'network': msg = '语音识别需要联网（Chrome 云端识别）'; break;
+        case 'network': msg = '语音识别需要联网（Chrome 云端识别），请检查网络'; break;
         case 'aborted': msg = '识别已中止'; break;
         case 'language-not-supported': msg = '不支持中文语音识别'; break;
-        default: msg = '识别出错：' + event.error;
+        case 'service-not-allowed': msg = '语音识别服务不可用，请检查浏览器设置'; break;
+        default: msg = '识别出错：' + (event.error || '未知错误');
       }
       document.getElementById('voiceHint').textContent = msg;
+      toast(msg, 'error');
       resetVoiceUI();
     };
 
@@ -472,7 +474,8 @@ async function startRecording() {
       document.getElementById('voiceHint').textContent = speechFinalText ? '识别中…（结果可编辑）' : '正在聆听…';
     };
     speechRecognition.onerror = (event) => {
-      document.getElementById('voiceHint').textContent = '识别出错：' + event.error;
+      document.getElementById('voiceHint').textContent = '识别出错：' + (event.error || '未知');
+      toast('语音识别错误：' + (event.error || '未知'), 'error');
       resetVoiceUI();
     };
     speechRecognition.onend = () => {
@@ -551,11 +554,9 @@ async function getTesseractWorker() {
   try {
     tesseractWorker = await Promise.race([
       Tesseract.createWorker(['chi_sim', 'eng'], 1, {
-        // langPath 使用函数格式，返回带 @1.0.0 版本号的直接 URL
-        // 跳过 unpkg 的 302 重定向，直接命中 Cloudflare CDN 缓存（速度提升 5x）
-        langPath: function(lang) {
-          return 'https://unpkg.com/@tesseract.js-data/' + lang + '@1.0.0/4.0.0/' + lang + '.traineddata.gz';
-        },
+        // unpkg CDN（国内可访问），302 重定向后由 Cloudflare 缓存加速
+        // 注意：langPath 只支持字符串，不支持函数（Tesseract.js v5 内部会用 new URL() 处理）
+        langPath: 'https://unpkg.com/@tesseract.js-data/',
         corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/',
         logger: (m) => {
           if (m.status === 'recognizing text') {
