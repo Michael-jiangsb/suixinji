@@ -2,8 +2,8 @@
  * 随心记 - Service Worker
  * PWA 离线缓存 + 更新策略：Cache First, Network Update
  */
-const CACHE_NAME = 'suixinji-v3';
-const TESSERACT_CACHE = 'tesseract-data-v1';
+const CACHE_NAME = 'suixinji-v4';
+const TESSERACT_CACHE = 'tesseract-data-v2';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -33,7 +33,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME)
+          .filter((name) => name !== CACHE_NAME && name !== TESSERACT_CACHE)
           .map((name) => caches.delete(name))
       );
     }).then(() => {
@@ -50,15 +50,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.protocol === 'chrome-extension:') return;
 
-  // 对于 CDN 资源（Tesseract.js），使用网络优先
-  if (url.hostname === 'cdn.jsdelivr.net') {
-    event.respondWith(networkFirst(event.request));
-    return;
-  }
-
   // 对于 Tesseract 语言包 CDN（unpkg.com），使用缓存优先以加速二次加载
   if (url.hostname === 'unpkg.com' && url.pathname.includes('tesseract')) {
-    event.respondWith(tesseractCacheFirst(request));
+    event.respondWith(tesseractCacheFirst(event.request));
     return;
   }
 
@@ -114,21 +108,5 @@ async function cacheFirst(request) {
       return caches.match('/index.html');
     }
     return new Response('Offline', { status: 503 });
-  }
-}
-
-// 网络优先策略（用于 CDN）
-async function networkFirst(request) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (e) {
-    const cached = await caches.match(request);
-    if (cached) return cached;
-    return new Response('Network error', { status: 503 });
   }
 }
