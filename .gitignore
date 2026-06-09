@@ -1,0 +1,9 @@
+# EdgeOne Pages
+.edgeone/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
