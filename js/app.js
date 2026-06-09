@@ -341,66 +341,85 @@ let speechFinalText = '';
 
 async function initVoice() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const hintEl = document.getElementById('voiceHint');
+  const btnEl = document.getElementById('btnVoice');
+
   if (!SpeechRecognition) {
-    document.getElementById('voiceHint').textContent = '当前浏览器不支持语音识别';
-    document.getElementById('btnVoice').textContent = '暂不可用';
-    document.getElementById('btnVoice').disabled = true;
+    hintEl.textContent = '当前浏览器不支持语音识别（需要 Chrome 或 Edge）';
+    btnEl.textContent = '暂不可用';
+    btnEl.disabled = true;
     return;
   }
 
-  speechRecognition = new SpeechRecognition();
-  speechRecognition.lang = 'zh-CN';
-  speechRecognition.interimResults = true;
-  speechRecognition.continuous = true;
-  speechRecognition.maxAlternatives = 1;
+  // 检查是否 HTTPS 或 localhost
+  const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isSecure) {
+    hintEl.textContent = '语音识别需要 HTTPS 或本地访问，请使用 https:// 开头的地址';
+    btnEl.textContent = '暂不可用';
+    btnEl.disabled = true;
+    return;
+  }
 
-  speechRecognition.onstart = () => {
-    isRecording = true;
-    speechFinalText = '';
-    document.getElementById('voiceIconWrap').classList.add('recording');
-    document.getElementById('voiceHint').textContent = '正在聆听，请说话…';
-    document.getElementById('btnVoice').textContent = '停止识别';
-    document.getElementById('btnVoice').classList.add('recording');
-  };
+  try {
+    speechRecognition = new SpeechRecognition();
+    speechRecognition.lang = 'zh-CN';
+    speechRecognition.interimResults = true;
+    speechRecognition.continuous = true;
+    speechRecognition.maxAlternatives = 1;
 
-  speechRecognition.onresult = (event) => {
-    let interim = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript;
-      if (event.results[i].isFinal) {
-        speechFinalText += transcript;
-      } else {
-        interim += transcript;
+    speechRecognition.onstart = () => {
+      isRecording = true;
+      speechFinalText = '';
+      document.getElementById('voiceIconWrap').classList.add('recording');
+      document.getElementById('voiceHint').textContent = '正在聆听，请说话…';
+      document.getElementById('btnVoice').textContent = '停止识别';
+      document.getElementById('btnVoice').classList.add('recording');
+    };
+
+    speechRecognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          speechFinalText += transcript;
+        } else {
+          interim += transcript;
+        }
       }
-    }
-    document.getElementById('voiceTextResult').value = speechFinalText + interim;
-    document.getElementById('voiceHint').textContent = speechFinalText ? '识别中…（结果可编辑）' : '正在聆听…';
-  };
+      document.getElementById('voiceTextResult').value = speechFinalText + interim;
+      document.getElementById('voiceHint').textContent = speechFinalText ? '识别中…（结果可编辑）' : '正在聆听…';
+    };
 
-  speechRecognition.onerror = (event) => {
-    console.error('SpeechRecognition error:', event.error);
-    let msg = '';
-    switch (event.error) {
-      case 'no-speech': msg = '未检测到语音，请重试'; break;
-      case 'audio-capture': msg = '无法访问麦克风'; break;
-      case 'not-allowed': msg = '麦克风权限被拒绝'; break;
-      case 'network': msg = '网络连接失败（语音识别需要联网）'; break;
-      case 'aborted': msg = '识别已中止'; break;
-      default: msg = '识别出错：' + event.error;
-    }
-    document.getElementById('voiceHint').textContent = msg;
-    resetVoiceUI();
-  };
+    speechRecognition.onerror = (event) => {
+      console.error('SpeechRecognition error:', event.error);
+      let msg = '';
+      switch (event.error) {
+        case 'no-speech': msg = '未检测到语音，请重试'; break;
+        case 'audio-capture': msg = '无法访问麦克风，请检查设备'; break;
+        case 'not-allowed': msg = '麦克风权限被拒绝，请在浏览器设置中允许'; break;
+        case 'network': msg = '语音识别需要联网（Chrome 云端识别）'; break;
+        case 'aborted': msg = '识别已中止'; break;
+        case 'language-not-supported': msg = '不支持中文语音识别'; break;
+        default: msg = '识别出错：' + event.error;
+      }
+      document.getElementById('voiceHint').textContent = msg;
+      resetVoiceUI();
+    };
 
-  speechRecognition.onend = () => {
-    resetVoiceUI();
-    const textArea = document.getElementById('voiceTextResult');
-    if (speechFinalText && !textArea.value.startsWith('[')) {
-      document.getElementById('voiceHint').textContent = '识别完成（Web Speech API）';
-    }
-  };
+    speechRecognition.onend = () => {
+      resetVoiceUI();
+      const textArea = document.getElementById('voiceTextResult');
+      if (speechFinalText && !textArea.value.startsWith('[')) {
+        document.getElementById('voiceHint').textContent = '识别完成，可以编辑后保存';
+      }
+    };
 
-  document.getElementById('voiceHint').textContent = '点击开始语音识别（Web Speech API）';
+    hintEl.textContent = '点击开始语音识别（需要联网，支持中文）';
+  } catch(e) {
+    hintEl.textContent = '语音识别初始化失败: ' + e.message;
+    btnEl.textContent = '暂不可用';
+    btnEl.disabled = true;
+  }
 }
 
 function resetVoiceUI() {
@@ -499,20 +518,25 @@ async function getTesseractWorker() {
 
   const progressEl = document.getElementById('ocrProgress');
   progressEl.classList.remove('hidden');
-  progressEl.textContent = '正在下载中文语言包（约 20MB，仅首次需要）…';
+  progressEl.textContent = '正在下载中文语言包（约 12MB，仅首次需要）…';
 
   try {
-    tesseractWorker = await Tesseract.createWorker('chi_sim+eng', 1, {
+    // Tesseract.js v5 使用数组形式的语言参数，OEM=1 (LSTM only)
+    tesseractWorker = await Tesseract.createWorker(['chi_sim', 'eng'], 1, {
       logger: (m) => {
         if (m.status === 'recognizing text') {
           const pct = Math.round(m.progress * 100);
           progressEl.textContent = `识别中… ${pct}%`;
         } else if (m.status === 'loading language traineddata') {
           progressEl.textContent = '加载语言模型…';
+        } else if (m.status === 'loading tesseract core') {
+          progressEl.textContent = '加载 Tesseract 核心引擎…';
         } else if (m.status === 'initializing tesseract') {
           progressEl.textContent = '初始化引擎…';
         } else if (m.status === 'initialized tesseract') {
           progressEl.textContent = '引擎就绪，开始识别…';
+        } else if (m.status === 'downloading') {
+          progressEl.textContent = `下载中… ${Math.round(m.progress * 100)}%`;
         }
       }
     });
@@ -616,10 +640,12 @@ async function doOcr() {
     const { data: { text, confidence } } = await worker.recognize(processedUrl);
 
     const result = text.trim();
+    // Tesseract.js v5: confidence 可能是数字或 undefined
+    const confVal = (typeof confidence === 'number') ? confidence : (data.confidence || 0);
     if (result) {
       textEdit.value = result;
       textEdit.placeholder = 'OCR 识别完成，可以编辑…';
-      const confPct = confidence ? ` · 置信度 ${Math.round(confidence)}%` : '';
+      const confPct = confVal > 0 ? ` · 置信度 ${Math.round(confVal)}%` : '';
       badge.textContent = `Tesseract.js · ${result.length} 字${confPct}`;
       toast(`OCR 识别完成，${result.length} 字`, 'success');
     } else {

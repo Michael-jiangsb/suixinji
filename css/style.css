@@ -1034,3 +1034,243 @@ body {
   color: var(--color-text-hint);
   margin-top: 28px;
 }
+
+/* =============================================
+   移动端响应式适配 (max-width: 768px)
+   ============================================= */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 100%;
+    --header-height: 50px;
+    font-size: 13px;
+  }
+
+  /* body 允许滚动 */
+  body {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: auto;
+  }
+
+  /* 顶部导航：精简 */
+  .app-header {
+    padding: 0 12px;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    /* iOS 安全区域 */
+    padding-top: env(safe-area-inset-top);
+    min-height: var(--header-height);
+    height: auto;
+    flex-wrap: wrap;
+  }
+  .header-center { display: none; }
+  .header-left .logo-text { font-size: 15px; }
+  .header-right { gap: 4px; }
+  .header-right .btn-icon { width: 36px; height: 36px; }
+  .header-right .btn-icon svg { width: 18px; height: 18px; }
+  .header-right .btn-primary { padding: 6px 12px; font-size: 12px; }
+  .header-right .btn-primary svg { width: 14px; height: 14px; }
+
+  /* 布局：上下堆叠 */
+  .app-layout {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  /* 侧边栏：折叠为横向主题条 */
+  .sidebar {
+    width: 100%;
+    flex-shrink: 0;
+    border-right: none;
+    border-bottom: 0.5px solid var(--color-border);
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding: 0;
+    height: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sidebar-header {
+    flex-shrink: 0;
+    border-bottom: none;
+    padding: 10px 12px;
+    border-right: 0.5px solid var(--color-border);
+  }
+  .sidebar-title { font-size: 11px; white-space: nowrap; }
+  .topic-list {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    overflow-x: auto;
+    padding: 6px 8px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .topic-list::-webkit-scrollbar { display: none; }
+  .topic-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 6px 10px;
+    border-radius: 16px;
+    font-size: 12px;
+    background: var(--color-bg);
+  }
+  .topic-item.active { background: var(--color-primary-light); }
+  .topic-name { font-size: 12px; }
+  .topic-count { display: none; }
+  .topic-actions { display: none !important; }
+  .loading-placeholder { white-space: nowrap; padding: 8px 12px; }
+
+  /* 主内容区 */
+  .main-content {
+    overflow: visible;
+    flex: auto;
+  }
+  .view { overflow: visible; }
+
+  /* 视图头部 */
+  .view-header {
+    padding: 14px 14px 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .view-title { font-size: 16px; }
+  .view-subtitle { font-size: 11px; }
+  .view-actions { flex-wrap: wrap; gap: 4px; }
+
+  /* 快速输入卡片 */
+  .quick-input-card {
+    margin: 0 10px 12px;
+    border-radius: var(--radius-md);
+  }
+
+  /* 输入模式标签 */
+  .tab-btn {
+    padding: 8px 4px;
+    font-size: 11px;
+    gap: 3px;
+  }
+  .tab-btn svg { width: 13px; height: 13px; }
+
+  /* 输入面板 */
+  .input-panel { padding: 10px 12px; }
+  .note-textarea { font-size: 13px; padding: 10px; }
+  .input-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .input-actions .btn-primary { flex: 1; min-width: 80px; }
+  .topic-select { flex: 1; min-width: 100px; }
+
+  /* 语音区域 */
+  .voice-area { padding: 12px; }
+  .voice-icon-wrap { width: 44px; height: 44px; }
+  .voice-icon-wrap svg { width: 20px; height: 20px; }
+
+  /* OCR 区域 */
+  .image-drop-zone { padding: 20px 12px; }
+  .ocr-result { flex-direction: column; }
+  .ocr-preview { width: 100%; }
+  .ocr-preview img { width: 100%; height: auto; max-height: 200px; }
+  .ocr-text-area { width: 100%; }
+  .ocr-text-area .input-actions { flex-wrap: wrap; }
+  .ocr-text-area .input-actions .btn-outline,
+  .ocr-text-area .input-actions .btn-primary { flex: 1; min-width: 70px; }
+
+  /* 仅上传图片 */
+  .image-only-result { flex-direction: column; }
+  .image-only-preview { width: 100%; }
+  .image-only-preview img { width: 100%; height: auto; max-height: 200px; }
+
+  /* 笔记列表 */
+  .notes-container { padding: 0 10px 20px; }
+  .notes-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .note-card { padding: 12px 14px; }
+  .note-card-content { -webkit-line-clamp: 3; font-size: 13px; }
+
+  /* 图库 */
+  .gallery-grid { padding: 0 10px 20px; }
+  .gallery-photos {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .gallery-card-img-wrap { height: 120px; }
+  .gallery-card-info { padding: 8px 10px 10px; }
+  .gallery-card-title { font-size: 12px; }
+  .gallery-card-actions { flex-direction: column; }
+  .gallery-card-actions .btn-sm { width: 100%; }
+
+  /* 思维导图 */
+  .mindmap-container {
+    margin: 0 10px 16px;
+    border-radius: var(--radius-md);
+  }
+  .mm-toolbar {
+    flex-wrap: wrap;
+    gap: 4px;
+    border-right: none;
+    padding-right: 0;
+    margin-right: 0;
+  }
+  .mm-tree { padding: 16px; }
+  .mm-node { max-width: 260px; font-size: 12px; padding: 6px 12px; }
+  .mm-node.root-node { max-width: 320px; font-size: 14px; padding: 8px 16px; }
+  .mm-children { padding-left: 20px; margin-left: 6px; }
+
+  /* 自动排版面板 */
+  .auto-parse-panel { margin: 0 10px 10px; }
+  .ap-textarea { font-size: 12px; padding: 10px; }
+  .ap-actions { flex-direction: column; gap: 8px; align-items: stretch; }
+  .ap-actions-right { justify-content: flex-end; }
+  .ap-hint-tags { gap: 4px; }
+  .ap-hint-tag { font-size: 9px; padding: 2px 6px; }
+
+  /* 弹窗适配 */
+  .modal { max-width: 96vw; max-height: 90vh; border-radius: var(--radius-md); }
+  .modal-sm { width: 92vw; }
+  .modal-lg { width: 94vw; }
+  .modal-header { padding: 12px 16px; }
+  .modal-body { padding: 12px 16px; }
+  .modal-footer { padding: 10px 16px; flex-wrap: wrap; gap: 6px; }
+  .modal-footer .btn-primary { flex: 1; min-width: 80px; }
+
+  /* Toast 通知 */
+  .toast { max-width: 85vw; font-size: 12px; padding: 8px 16px; }
+  .toast-container { bottom: 16px; }
+
+  /* 登录界面 */
+  .login-card { padding: 32px 24px 28px; width: 92vw; }
+  .login-logo-text { font-size: 20px; }
+  .login-logo-icon { font-size: 24px; }
+  .login-input { font-size: 14px; padding: 11px 12px 11px 38px; }
+  .login-btn { font-size: 15px; padding: 12px; }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar { width: 3px; }
+}
+
+/* =============================================
+   小屏手机适配 (max-width: 400px)
+   ============================================= */
+@media (max-width: 400px) {
+  :root { font-size: 12px; }
+
+  .header-right .btn-primary { padding: 5px 10px; font-size: 11px; }
+  .tab-btn { font-size: 10px; padding: 6px 2px; }
+  .tab-btn svg { width: 12px; height: 12px; }
+
+  .gallery-photos { grid-template-columns: 1fr; }
+  .gallery-card-img-wrap { height: 180px; }
+
+  .notes-grid { grid-template-columns: 1fr; }
+
+  .mm-node { max-width: 220px; font-size: 11px; }
+  .mm-node.root-node { max-width: 280px; font-size: 13px; }
+  .mm-children { padding-left: 16px; }
+}

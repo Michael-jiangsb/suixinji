@@ -1,5 +1,12 @@
 # 随心记 - GitHub Pages 部署指南
 
+> **状态：✅ 已部署上线**
+> **线上地址：** https://michael-jiangsb.github.io/suixinji/
+> **仓库：** https://github.com/Michael-jiangsb/suixinji
+> **账号：** admin / 159357
+
+---
+
 > **目标：** 将随心记 H5 PWA 应用部署到 GitHub Pages，实现永久免费、HTTPS、全球可访问。
 
 ---
